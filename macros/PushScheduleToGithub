@@ -1,0 +1,57 @@
+Option Explicit
+
+Sub PushScheduleToGitHub()
+    Dim repoOwner As String, repoName As String, branch As String
+    Dim token As String, apiUrl As String
+    Dim filePath As String, fileName As String
+    Dim base64Content As String, jsonBody As String
+    Dim http As Object, resp As String
+    
+    ' ==== CONFIGURE HERE ====
+    repoOwner = "your-username"
+    repoName = "schedule-app"
+    branch = "main"
+    token = "ghp_yourHardcodedTokenHere"
+    
+    ' Get latest schedule file in /data
+    filePath = ThisWorkbook.Path & "\data\"
+    fileName = Dir(filePath & "schedule-*.csv")
+    If fileName = "" Then
+        MsgBox "No schedule file found in /data.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Convert to Base64
+    base64Content = EncodeBase64(filePath & fileName)
+    
+    ' API endpoint
+    apiUrl = "https://api.github.com/repos/" & repoOwner & "/" & repoName & "/contents/data/" & fileName
+    
+    ' JSON payload
+    jsonBody = "{""message"":""Add schedule " & fileName & """,""content"":""" & base64Content & """,""branch"":""" & branch & """}"
+    
+    ' HTTP PUT request
+    Set http = CreateObject("MSXML2.XMLHTTP")
+    http.Open "PUT", apiUrl, False
+    http.setRequestHeader "Authorization", "token " & token
+    http.setRequestHeader "Content-Type", "application/json"
+    http.Send jsonBody
+    
+    resp = http.responseText
+    MsgBox "GitHub push response: " & resp, vbInformation
+End Sub
+
+Private Function EncodeBase64(filePath As String) As String
+    Dim inStream As Object, dom As Object
+    Set inStream = CreateObject("ADODB.Stream")
+    Set dom = CreateObject("Microsoft.XMLDOM").createElement("tmp")
+    
+    inStream.Type = 1
+    inStream.Open
+    inStream.LoadFromFile filePath
+    dom.DataType = "bin.base64"
+    dom.NodeTypedValue = inStream.Read
+    EncodeBase64 = Replace(dom.Text, vbLf, "")
+    inStream.Close
+End Function
+

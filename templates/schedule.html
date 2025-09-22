@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Schedule</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <img src="{{ url_for('static', filename='banner.png') }}" alt="Banner" class="banner">
+    <h1>Team Schedule</h1>
+  </header>
+
+  <div class="controls">
+    <input type="text" id="searchBox" placeholder="Search name...">
+    <button onclick="prevSchedule()">Previous</button>
+    <button onclick="nextSchedule()">Next</button>
+  </div>
+
+  <div id="schedule-container">
+    {% for schedule in schedules %}
+      <section class="schedule-block" data-start="{{ schedule.start }}">
+        <h2>{{ schedule.week_range }}</h2>
+        <table>
+          <thead>
+            <tr>
+              {% for col in schedule.columns %}
+                <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in schedule.data %}
+              <tr>
+                {% for col in schedule.columns %}
+                  <td>{{ row[col] }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endfor %}
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
