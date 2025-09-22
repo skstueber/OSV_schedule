@@ -1,107 +1,93 @@
-Option Explicit
-
 Sub ExportSchedule()
     Dim ws As Worksheet
-    Dim rngNames As Range, rngDates As Range
-    Dim lastRow As Long, lastCol As Long
-    Dim i As Long, j As Long
+    Dim rngDates As Range, rngJobs As Range
+    Dim lastCol As Long, lastRow As Long
     Dim dict As Object
+    Dim i As Long, j As Long
     Dim nameVal As String, dateVal As String, jobVal As String
-    Dim csvPath As String, desktopPath As String, repoPath As String
-    Dim fso As Object, csvFile As Object
-    Dim startDate As Date, endDate As Date
+    Dim rowIdx As Long, colIdx As Long
+    Dim repoPath As String, desktopPath As String, csvPath As String
     
-    Set ws = ThisWorkbook.Sheets(1) ' assumes schedule is in first sheet
+    '--- Set sheet ---
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change to your sheet name
     
-    ' Find ranges
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    '--- Find ranges ---
     lastCol = ws.Cells(2, ws.Columns.Count).End(xlToLeft).Column
-    Set rngNames = ws.Range("A3:A" & lastRow) ' names/jobs start at row 3
-    Set rngDates = ws.Range(ws.Cells(2, 2), ws.Cells(2, lastCol)) ' row 2 has dates
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    Set rngDates = ws.Range(ws.Cells(2, 2), ws.Cells(2, lastCol)) ' Dates in row 2, from col B
+    Set rngJobs = ws.Range(ws.Cells(3, 1), ws.Cells(lastRow, 1))  ' Names in col A from row 3
     
-    ' Determine start (Monday) and end (Sunday) of this 2-week block
-    startDate = rngDates.Cells(1, 1).Value
-    endDate = startDate + 13
+    '--- Repo + Desktop paths ---
+    repoPath = ThisWorkbook.Path
+    desktopPath = Environ("USERPROFILE") & "\Desktop"
+    csvPath = "schedule.csv"
     
-    ' Prepare dictionary to hold reformatted schedule
+    '--- Create dictionary ---
     Set dict = CreateObject("Scripting.Dictionary")
     
-    ' Build schedule: Names (rows), Dates (cols), Jobs separated by "/"
-    For i = 1 To rngNames.Rows.Count
-        nameVal = Trim(rngNames.Cells(i, 1).Value)
+    '--- Loop through names and dates ---
+    For i = 1 To rngJobs.Rows.Count
+        nameVal = Trim(rngJobs.Cells(i, 1).Value)
         If nameVal <> "" Then
-            If Not dict.Exists(nameVal) Then
-                dict(nameVal) = CreateObject("Scripting.Dictionary")
-            End If
+            If Not dict.exists(nameVal) Then dict.Add nameVal, CreateObject("Scripting.Dictionary")
+            
             For j = 1 To rngDates.Columns.Count
-                dateVal = Format(rngDates.Cells(1, j).Value, "yyyy-mm-dd")
-                jobVal = Trim(ws.Cells(i + 2, j + 1).Value) ' offset (names start at row 3, dates at col 2)
-                If jobVal <> "" Then
-                    If dict(nameVal).Exists(dateVal) Then
-                        dict(nameVal)(dateVal) = dict(nameVal)(dateVal) & "/" & jobVal
-                    Else
-                        dict(nameVal)(dateVal) = jobVal
+                dateVal = CStr(rngDates.Cells(1, j).Value)
+                If dateVal <> "" Then
+                    rowIdx = rngJobs.Cells(i, 1).Row
+                    colIdx = rngDates.Cells(1, j).Column
+                    jobVal = Trim(ws.Cells(rowIdx, colIdx).Value)
+                    
+                    If jobVal <> "" Then
+                        If Not dict(nameVal).exists(dateVal) Then
+                            dict(nameVal)(dateVal) = jobVal
+                        Else
+                            dict(nameVal)(dateVal) = dict(nameVal)(dateVal) & "/" & jobVal
+                        End If
                     End If
                 End If
             Next j
         End If
     Next i
     
-    ' File paths
-    desktopPath = Environ("USERPROFILE") & "\Desktop\ScheduleExports"
-    If Dir(desktopPath, vbDirectory) = "" Then MkDir desktopPath
+    '--- Write CSV to repo and desktop ---
+    WriteCSV dict, rngDates, repoPath & "\" & csvPath
+    WriteCSV dict, rngDates, desktopPath & "\" & csvPath
     
-    repoPath = ThisWorkbook.Path & "\data"
-    If Dir(repoPath, vbDirectory) = "" Then MkDir repoPath
-    
-    csvPath = "schedule-" & Format(startDate, "yyyy-mm-dd") & ".csv"
-    
-    ' Write CSV (repo copy)
-    Call WriteCSV(dict, rngDates, repoPath & "\" & csvPath)
-    
-    ' Write CSV (desktop copy)
-    Call WriteCSV(dict, rngDates, desktopPath & "\" & csvPath)
-    
-    ' Set Desktop CSV as read-only
-    SetAttr desktopPath & "\" & csvPath, vbReadOnly
-    
-    ' Open Desktop CSV
-    Workbooks.Open desktopPath & "\" & csvPath
-    
-    MsgBox "Schedule exported to: " & vbCrLf & _
-           repoPath & "\" & csvPath & vbCrLf & _
-           desktopPath & "\" & csvPath, vbInformation
+    '--- Open the desktop CSV for preview ---
+    Shell "notepad.exe " & desktopPath & "\" & csvPath, vbNormalFocus
 End Sub
 
-Private Sub WriteCSV(dict As Object, rngDates As Range, outPath As String)
-    Dim fso As Object, ts As Object
-    Dim nameKey As Variant, dateKey As Variant
-    Dim line As String, j As Long
+
+Private Sub WriteCSV(dict As Object, rngDates As Range, fullPath As String)
+    Dim fso As Object, f As Object
+    Dim i As Long, j As Long
+    Dim line As String, nameVal As String, dateVal As String
     
     Set fso = CreateObject("Scripting.FileSystemObject")
-    Set ts = fso.CreateTextFile(outPath, True, False)
+    Set f = fso.CreateTextFile(fullPath, True, False)
     
-    ' Header row
+    '--- Header row ---
     line = "Name"
     For j = 1 To rngDates.Columns.Count
-        line = line & "," & Format(rngDates.Cells(1, j).Value, "yyyy-mm-dd")
+        line = line & "," & rngDates.Cells(1, j).Value
     Next j
-    ts.WriteLine line
+    f.WriteLine line
     
-    ' Data rows
-    For Each nameKey In dict.Keys
-        line = nameKey
+    '--- Rows for each person ---
+    For Each nameVal In dict.Keys
+        line = nameVal
         For j = 1 To rngDates.Columns.Count
-            dateKey = Format(rngDates.Cells(1, j).Value, "yyyy-mm-dd")
-            If dict(nameKey).Exists(dateKey) Then
-                line = line & "," & dict(nameKey)(dateKey)
+            dateVal = CStr(rngDates.Cells(1, j).Value)
+            If dict(nameVal).exists(dateVal) Then
+                line = line & "," & dict(nameVal)(dateVal)
             Else
                 line = line & ","
             End If
         Next j
-        ts.WriteLine line
-    Next nameKey
+        f.WriteLine line
+    Next nameVal
     
-    ts.Close
+    f.Close
 End Sub
 
