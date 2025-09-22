@@ -9,7 +9,7 @@ Sub ExportSchedule()
     Dim repoPath As String, desktopPath As String, csvPath As String
     
     '--- Set sheet ---
-    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change to your sheet name
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change if sheet name is different
     
     '--- Find ranges ---
     lastCol = ws.Cells(2, ws.Columns.Count).End(xlToLeft).Column
@@ -61,8 +61,9 @@ End Sub
 
 Private Sub WriteCSV(dict As Object, rngDates As Range, fullPath As String)
     Dim fso As Object, f As Object
-    Dim i As Long, j As Long
-    Dim line As String, nameVal As String, dateVal As String
+    Dim j As Long
+    Dim line As String, dateVal As String
+    Dim key As Variant  ' must be Variant for dictionary keys
     
     Set fso = CreateObject("Scripting.FileSystemObject")
     Set f = fso.CreateTextFile(fullPath, True, False)
@@ -75,18 +76,18 @@ Private Sub WriteCSV(dict As Object, rngDates As Range, fullPath As String)
     f.WriteLine line
     
     '--- Rows for each person ---
-    For Each nameVal In dict.Keys
-        line = nameVal
+    For Each key In dict.Keys
+        line = CStr(key)
         For j = 1 To rngDates.Columns.Count
             dateVal = CStr(rngDates.Cells(1, j).Value)
-            If dict(nameVal).exists(dateVal) Then
-                line = line & "," & dict(nameVal)(dateVal)
+            If dict(key).exists(dateVal) Then
+                line = line & "," & dict(key)(dateVal)
             Else
                 line = line & ","
             End If
         Next j
         f.WriteLine line
-    Next nameVal
+    Next key
     
     f.Close
 End Sub
