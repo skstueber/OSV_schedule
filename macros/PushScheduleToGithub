@@ -8,10 +8,10 @@ Sub PushScheduleToGitHub()
     Dim http As Object, resp As String
     
     ' ==== CONFIGURE HERE ====
-    repoOwner = "skstueber"
-    repoName = "OSV_schedule"
-    branch = "main"
-    token = "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"
+    repoOwner = "\\"
+    repoName = "\\"
+    branch = "\\"
+    token = "\\"
     
     ' Get latest schedule file in /data
     filePath = ThisWorkbook.Path & "\data\"
